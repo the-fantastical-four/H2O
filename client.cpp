@@ -30,7 +30,7 @@ int main() {
     // Connect to the server
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
-    if (InetPton(AF_INET, _T("127.0.0.1"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
+    if (InetPton(AF_INET, _T("25.14.62.92"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
         std::cerr << "Invalid address.\n";
         closesocket(clientSocket);
         WSACleanup();
@@ -47,10 +47,31 @@ int main() {
 
     std::cout << "Connected to server.\n";
 
+    // TODO: prompt user for a start point and end point 
+    std::string moleculeType;
+    int requests;
+    int i = 1;
+    int step = 1;
+
+    std::cout << "H or O?: ";
+    std::cin >> moleculeType;
+
+    std::cout << "Input number of requests: ";
+    std::cin >> requests;
+    
+    int nRequests = requests;
+
+    if (moleculeType == "H") {
+        i = 2;
+        step = 2;
+    }
+
     // send requests to server 
     // this loop will be different depending on oxygen or hydrogen 
-    for (int i = 0; i < NUM_PARTICLES * 2; i += 2) {
-
+    for (i; i < nRequests * 2; i += step) {
+        std::cout << i << std::endl;
+        int toSend = htonl(i);
+        send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
     }
 
     // receive responses from the server 
