@@ -23,7 +23,9 @@ struct BondMonitor {
     std::condition_variable hydrogenCond; 
     std::condition_variable oxygenCond; 
 
-    std::unique_lock<std::mutex> condLock;
+    std::unique_lock<std::mutex> condLock; // this lock is needed for C++ condition variables 
+
+    BondMonitor() : condLock(std::mutex()) {} // initialize the monitor with a lock 
 
     void addToHydrogenQueue(int id) {
         hydrogenQueue.push(id); 
@@ -94,6 +96,12 @@ void handleClient(SOCKET clientSocket) {
     }
 }
 
+void makeBonds() {
+    while (true) {
+        monitor.bond(); 
+    }
+}
+
 int main() {
     // Initialize Winsock
     WSADATA wsaData;
@@ -133,6 +141,8 @@ int main() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
+    std::thread bondThread = std::thread(makeBonds); 
+
     // Accept a client socket
     // launching a thread to accept multiple clients 
     std::thread acceptClientThread([&]() {
@@ -158,12 +168,7 @@ int main() {
 
     acceptClientThread.join(); // wait for thread to finish
 
-    monitor.bond(); 
-
-    // bonding logic 
-    while (true) { 
-
-    }
+    bondThread.join(); 
 
     closesocket(serverSocket);
     WSACleanup();
