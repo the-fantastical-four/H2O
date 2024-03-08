@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <queue>
+#include <condition_variable>
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
@@ -15,9 +16,81 @@ std::mutex clientMutex;
 std::queue<int> hydrogenQueue; 
 std::queue<int> oxygenQueue; 
 
+struct BondMonitor {
+    std::queue<int> hydrogenQueue;
+    std::queue<int> oxygenQueue;
+
+    std::condition_variable hydrogenCond; 
+    std::condition_variable oxygenCond; 
+
+    std::unique_lock<std::mutex> condLock;
+
+    void addToHydrogenQueue(int id) {
+        hydrogenQueue.push(id); 
+
+        if (hydrogenQueue.size() >= 2) {
+            hydrogenCond.notify_one(); 
+        }
+    }
+
+    void addToOxygenQueue(int id) {
+        oxygenQueue.push(id); 
+
+        oxygenCond.notify_one(); 
+    }
+
+    void bond() {
+        if (oxygenQueue.empty()) {
+            oxygenCond.wait(condLock, [this] { return !oxygenQueue.empty(); });
+        }
+
+        if (hydrogenQueue.size() < 2) {
+            hydrogenCond.wait(condLock, [this] { return oxygenQueue.size() >= 2; });
+        }
+
+        std::cout << "O" << oxygenQueue.front() << ", bond, <timestamp>" << std::endl; 
+        oxygenQueue.pop(); 
+        
+        std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl; 
+        hydrogenQueue.pop(); 
+
+        std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
+        hydrogenQueue.pop(); 
+    }
+};
+
+BondMonitor monitor; 
+
 void handleClient(SOCKET clientSocket) {
     while (true) {
         // handle receiving requests from the clients here
+
+        int particleId; 
+        
+        // receive message from client and store in particleId 
+        int bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&particleId), sizeof(particleId), 0);
+
+        if (bytesReceived > 0) {
+            particleId = ntohl(particleId);
+             
+            // sort received id's to their respective queues and log
+
+            if (particleId % 2 == 0) {
+                int id = particleId / 2; 
+                std::cout << "H" << id << ", request, <timestamp>" << std::endl; 
+                // hydrogenQueue.push(id); 
+                monitor.addToHydrogenQueue(id); 
+
+            }
+            else {
+                int id = particleId / 2 + 1; 
+                std::cout << "O" << id << ", request, <timestamp>" << std::endl;
+                // oxygenQueue.push(id); 
+                monitor.addToOxygenQueue(id); 
+            }
+        }
+        
+        
     }
 }
 
@@ -64,7 +137,7 @@ int main() {
     // launching a thread to accept multiple clients 
     std::thread acceptClientThread([&]() {
         
-        while (true) { // might change this while loop to stop after 2 iterations for 2 clients
+        while (clients.size() < 2) { // might change this while loop to stop after 2 iterations for 2 clients
             SOCKET clientSocket = accept(serverSocket, nullptr, nullptr);
             if (clientSocket == INVALID_SOCKET) {
                 std::cerr << "Accept failed with error: " << WSAGetLastError() << std::endl;
@@ -84,6 +157,8 @@ int main() {
         }); 
 
     acceptClientThread.join(); // wait for thread to finish
+
+    monitor.bond(); 
 
     // bonding logic 
     while (true) { 
