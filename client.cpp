@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>  // Include for InetPton function
 #include <tchar.h>
 #include <chrono>  // Include the chrono library
+#include <iomanip>
 
 #pragma comment(lib, "ws2_32.lib")  // Link against the Winsock library
 
@@ -69,9 +70,19 @@ int main() {
     // send requests to server 
     // this loop will be different depending on oxygen or hydrogen 
     for (i; i <= nRequests * 2; i += 2) {
-        std::cout << i << std::endl;
         int toSend = htonl(i);
         send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
+
+        int id = (moleculeType == "H") ? i / 2 : i / 2 + 1;
+
+        // Get the current time
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::system_clock::to_time_t(now);
+
+        // Convert time_t to tm as local time
+        std::tm bt = *std::localtime(&timestamp);
+
+        std::cout << moleculeType << id << ", request, " << std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
     }
     
 
@@ -81,6 +92,14 @@ int main() {
     int bytesReceived;
 
     do {
+
+        // Get the current time
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::system_clock::to_time_t(now);
+
+        // Convert time_t to tm as local time
+        std::tm bt = *std::localtime(&timestamp);
+
         bytesReceived = recv(clientSocket, buffer, 2048 - 1, 0);
 
         if (bytesReceived == SOCKET_ERROR) {
@@ -94,7 +113,7 @@ int main() {
 
         // Process the received data (assuming it's a null-terminated string)
         buffer[bytesReceived] = '\0';  // Ensure null-termination
-        std::cout << "SERVER: " << buffer << std::endl;
+        std::cout << "SERVER: " << buffer << std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
 
     } while (bytesReceived > 0);
 

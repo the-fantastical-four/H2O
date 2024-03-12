@@ -10,37 +10,26 @@
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
+#define HYDROGEN_CLIENT 0
+#define OXYGEN_CLIENT 1 
+
 int PORT = 6250;
 
 std::vector<SOCKET> clients; 
 std::mutex clientMutex; 
 
-
 struct BondMonitor {
     std::queue<int> hydrogenQueue;
     std::queue<int> oxygenQueue;
 
-    std::condition_variable hydrogenCond; 
-    std::condition_variable oxygenCond; 
-
-    std::unique_lock<std::mutex> condLock; // this lock is needed for C++ condition variables 
-
-    std::mutex condMutex;  // Add this member variable
     std::mutex logMutex;
-
-
-    BondMonitor() : condLock(std::unique_lock<std::mutex>(condMutex)) {} // initialize the monitor with a lock 
 
     void addToHydrogenQueue(int id) {
         hydrogenQueue.push(id); 
-
-        oxygenCond.notify_one(); 
     }
 
     void addToOxygenQueue(int id) {
         oxygenQueue.push(id); 
-
-        oxygenCond.notify_one(); 
     }
 
     // this is just to ensure that logs aren't logging at the same time 
@@ -58,24 +47,33 @@ struct BondMonitor {
         std::cout << message <<  std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
     }
 
-    void bond() {
+    void sendMessageToClient(int clientIndex, std::string message) {
+        int bytesSent = send(clients[clientIndex], message.c_str(), static_cast<int>(message.length()), 0);
 
-        // oxygenCond.wait(condLock, [this] { return !oxygenQueue.empty() && hydrogenQueue.size() >= 2; });
+        if (bytesSent == SOCKET_ERROR) {
+            std::cerr << "Failed to send message.\n";
+        }
+    }
+
+    void bond() {
 
         if (!oxygenQueue.empty() && hydrogenQueue.size() >= 2) {
 
-            // hydrogenCond.wait(condLock, [this] { return hydrogenQueue.size() >= 2; });
+            std::string message; 
 
-            // std::cout << "O" << oxygenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("O" + std::to_string(oxygenQueue.front()) + ", bond, ");
+            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, "; 
+            log(message);
+            sendMessageToClient(OXYGEN_CLIENT, message); 
             oxygenQueue.pop();
 
-            // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, ");
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, "; 
+            log(message);
+            sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
 
-            // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, ");
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, "; 
+            log(message);
+            sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
         }
     }
@@ -100,16 +98,12 @@ void handleClient(SOCKET clientSocket) {
             if (particleId % 2 == 0) {
                 int id = particleId / 2; 
                 monitor.log("H" + std::to_string(id) + ", request, ");
-                //std::cout << "H" << id << ", request, <timestamp>" << std::endl; 
-                // hydrogenQueue.push(id); 
                 monitor.addToHydrogenQueue(id); 
 
             }
             else {
                 int id = particleId / 2 + 1; 
                 monitor.log("O" + std::to_string(id) + ", request, ");
-                // std::cout << "O" << id << ", request, <timestamp>" << std::endl;
-                // oxygenQueue.push(id); 
                 monitor.addToOxygenQueue(id); 
             }
         }
