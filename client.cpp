@@ -100,6 +100,9 @@ int main() {
         // Convert time_t to tm as local time
         std::tm bt = *std::localtime(&timestamp);
 
+        // Clear the buffer before each recv call
+        memset(buffer, 0, sizeof(buffer));
+
         bytesReceived = recv(clientSocket, buffer, 2048 - 1, 0);
 
         if (bytesReceived == SOCKET_ERROR) {
@@ -114,6 +117,8 @@ int main() {
         // Process the received data (assuming it's a null-terminated string)
         buffer[bytesReceived] = '\0';  // Ensure null-termination
         std::cout << "SERVER: " << buffer << std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
+
+        
 
     } while (bytesReceived > 0);
 
