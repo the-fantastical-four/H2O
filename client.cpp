@@ -51,7 +51,7 @@ int main() {
     std::string moleculeType;
     int requests;
     int i = 1;
-    int step = 1;
+    int step = 2;
 
     std::cout << "H or O?: ";
     std::cin >> moleculeType;
@@ -59,16 +59,16 @@ int main() {
     std::cout << "Input number of requests: ";
     std::cin >> requests;
     
-    int nRequests = requests;
+    int nRequests = requests * 2;
 
     if (moleculeType == "H") {
         i = 2;
-        step = 2;
+        nRequests += 2;
     }
 
     // send requests to server 
     // this loop will be different depending on oxygen or hydrogen 
-    for (i; i < nRequests * 2; i += step) {
+    for (i; i < nRequests; i += step) {
         std::cout << i << std::endl;
         int toSend = htonl(i);
         send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);

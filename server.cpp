@@ -13,9 +13,6 @@ int PORT = 6250;
 std::vector<SOCKET> clients; 
 std::mutex clientMutex; 
 
-std::queue<int> hydrogenQueue; 
-std::queue<int> oxygenQueue; 
-
 struct BondMonitor {
     std::queue<int> hydrogenQueue;
     std::queue<int> oxygenQueue;
@@ -25,14 +22,14 @@ struct BondMonitor {
 
     std::unique_lock<std::mutex> condLock; // this lock is needed for C++ condition variables 
 
-    BondMonitor() : condLock(std::mutex()) {} // initialize the monitor with a lock 
+    std::mutex condMutex;  // Add this member variable
+
+    BondMonitor() : condLock(std::unique_lock<std::mutex>(condMutex)) {} // initialize the monitor with a lock 
 
     void addToHydrogenQueue(int id) {
         hydrogenQueue.push(id); 
 
-        if (hydrogenQueue.size() >= 2) {
-            hydrogenCond.notify_one(); 
-        }
+        oxygenCond.notify_one(); 
     }
 
     void addToOxygenQueue(int id) {
@@ -41,23 +38,31 @@ struct BondMonitor {
         oxygenCond.notify_one(); 
     }
 
+    // this is just to ensure that logs aren't logging at the same time 
+    void log(std::string message) {
+        std::cout << message << std::endl; 
+    }
+
     void bond() {
-        if (oxygenQueue.empty()) {
-            oxygenCond.wait(condLock, [this] { return !oxygenQueue.empty(); });
+
+        // oxygenCond.wait(condLock, [this] { return !oxygenQueue.empty() && hydrogenQueue.size() >= 2; });
+
+        if (!oxygenQueue.empty() && hydrogenQueue.size() >= 2) {
+
+            // hydrogenCond.wait(condLock, [this] { return hydrogenQueue.size() >= 2; });
+
+            // std::cout << "O" << oxygenQueue.front() << ", bond, <timestamp>" << std::endl;
+            log("O" + std::to_string(oxygenQueue.front()) + ", bond, <timestamp>");
+            oxygenQueue.pop();
+
+            // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
+            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, <timestamp>");
+            hydrogenQueue.pop();
+
+            // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
+            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, <timestamp>");
+            hydrogenQueue.pop();
         }
-
-        if (hydrogenQueue.size() < 2) {
-            hydrogenCond.wait(condLock, [this] { return oxygenQueue.size() >= 2; });
-        }
-
-        std::cout << "O" << oxygenQueue.front() << ", bond, <timestamp>" << std::endl; 
-        oxygenQueue.pop(); 
-        
-        std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl; 
-        hydrogenQueue.pop(); 
-
-        std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
-        hydrogenQueue.pop(); 
     }
 };
 
@@ -79,14 +84,16 @@ void handleClient(SOCKET clientSocket) {
 
             if (particleId % 2 == 0) {
                 int id = particleId / 2; 
-                std::cout << "H" << id << ", request, <timestamp>" << std::endl; 
+                monitor.log("H" + std::to_string(id) + " , request, <timestamp>");
+                //std::cout << "H" << id << ", request, <timestamp>" << std::endl; 
                 // hydrogenQueue.push(id); 
                 monitor.addToHydrogenQueue(id); 
 
             }
             else {
                 int id = particleId / 2 + 1; 
-                std::cout << "O" << id << ", request, <timestamp>" << std::endl;
+                monitor.log("O" + std::to_string(id) + " , request, <timestamp>");
+                // std::cout << "O" << id << ", request, <timestamp>" << std::endl;
                 // oxygenQueue.push(id); 
                 monitor.addToOxygenQueue(id); 
             }
@@ -97,6 +104,7 @@ void handleClient(SOCKET clientSocket) {
 }
 
 void makeBonds() {
+    std::cout << "creating bonds..." << std::endl; 
     while (true) {
         monitor.bond(); 
     }
@@ -141,7 +149,7 @@ int main() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    std::thread bondThread = std::thread(makeBonds); 
+    std::thread bondThread = std::thread(makeBonds);
 
     // Accept a client socket
     // launching a thread to accept multiple clients 
@@ -166,7 +174,7 @@ int main() {
 
         }); 
 
-    acceptClientThread.join(); // wait for thread to finish
+    acceptClientThread.detach(); 
 
     bondThread.join(); 
 
