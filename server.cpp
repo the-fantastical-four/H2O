@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include <chrono>
 #include <iomanip>
+#include <ctime>
+#include <sstream>
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
@@ -17,6 +19,24 @@ int PORT = 6250;
 
 std::vector<SOCKET> clients; 
 std::mutex clientMutex; 
+
+std::string getCurrentTimeString() {
+
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    auto timestamp = std::chrono::system_clock::to_time_t(now);
+
+    // Convert time_t to tm as local time
+    std::tm bt = *std::localtime(&timestamp);
+
+    // Format the date and time
+    std::ostringstream oss;
+    oss << std::put_time(&bt, "%Y-%m-%d %H:%M:%S");
+
+    // Return the formatted time as a string
+    return oss.str();
+
+}
 
 struct BondMonitor {
     std::queue<int> hydrogenQueue;
@@ -37,14 +57,7 @@ struct BondMonitor {
         // Lock the mutex to ensure exclusive access to std::cout
         std::lock_guard<std::mutex> guard(logMutex);
 
-        // Get the current time
-        auto now = std::chrono::system_clock::now();
-        auto timestamp = std::chrono::system_clock::to_time_t(now);
-
-        // Convert time_t to tm as local time
-        std::tm bt = *std::localtime(&timestamp);
-
-        std::cout << message <<  std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
+        std::cout << message;
     }
 
     void sendMessageToClient(int clientIndex, std::string message) {
@@ -61,17 +74,17 @@ struct BondMonitor {
 
             std::string message; 
 
-            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, "; 
+            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
             log(message);
             sendMessageToClient(OXYGEN_CLIENT, message); 
             oxygenQueue.pop();
 
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, "; 
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
 
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, "; 
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
@@ -97,13 +110,13 @@ void handleClient(SOCKET clientSocket) {
 
             if (particleId % 2 == 0) {
                 int id = particleId / 2; 
-                monitor.log("H" + std::to_string(id) + ", request, ");
+                monitor.log("H" + std::to_string(id) + ", request, " + getCurrentTimeString() + "\n");
                 monitor.addToHydrogenQueue(id); 
 
             }
             else {
                 int id = particleId / 2 + 1; 
-                monitor.log("O" + std::to_string(id) + ", request, ");
+                monitor.log("O" + std::to_string(id) + ", request, " + getCurrentTimeString() + "\n");
                 monitor.addToOxygenQueue(id); 
             }
         }

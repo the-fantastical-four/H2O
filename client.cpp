@@ -92,14 +92,6 @@ int main() {
     int bytesReceived;
 
     do {
-
-        // Get the current time
-        auto now = std::chrono::system_clock::now();
-        auto timestamp = std::chrono::system_clock::to_time_t(now);
-
-        // Convert time_t to tm as local time
-        std::tm bt = *std::localtime(&timestamp);
-
         // Clear the buffer before each recv call
         memset(buffer, 0, sizeof(buffer));
 
@@ -114,11 +106,9 @@ int main() {
             break;
         }
 
-        // Process the received data (assuming it's a null-terminated string)
+        // Print the received data
         buffer[bytesReceived] = '\0';  // Ensure null-termination
-        std::cout << "SERVER: " << buffer << std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
-
-        
+        std::cout << buffer;
 
     } while (bytesReceived > 0);
 
