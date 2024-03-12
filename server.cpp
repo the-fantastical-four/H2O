@@ -5,6 +5,8 @@
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include <chrono>
+#include <iomanip>
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
@@ -12,6 +14,7 @@ int PORT = 6250;
 
 std::vector<SOCKET> clients; 
 std::mutex clientMutex; 
+
 
 struct BondMonitor {
     std::queue<int> hydrogenQueue;
@@ -23,6 +26,8 @@ struct BondMonitor {
     std::unique_lock<std::mutex> condLock; // this lock is needed for C++ condition variables 
 
     std::mutex condMutex;  // Add this member variable
+    std::mutex logMutex;
+
 
     BondMonitor() : condLock(std::unique_lock<std::mutex>(condMutex)) {} // initialize the monitor with a lock 
 
@@ -40,7 +45,17 @@ struct BondMonitor {
 
     // this is just to ensure that logs aren't logging at the same time 
     void log(std::string message) {
-        std::cout << message << std::endl; 
+        // Lock the mutex to ensure exclusive access to std::cout
+        std::lock_guard<std::mutex> guard(logMutex);
+
+        // Get the current time
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::system_clock::to_time_t(now);
+
+        // Convert time_t to tm as local time
+        std::tm bt = *std::localtime(&timestamp);
+
+        std::cout << message <<  std::put_time(&bt, "%Y-%m-%d %H:%M:%S") << std::endl;
     }
 
     void bond() {
@@ -52,15 +67,15 @@ struct BondMonitor {
             // hydrogenCond.wait(condLock, [this] { return hydrogenQueue.size() >= 2; });
 
             // std::cout << "O" << oxygenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("O" + std::to_string(oxygenQueue.front()) + ", bond, <timestamp>");
+            log("O" + std::to_string(oxygenQueue.front()) + ", bond, ");
             oxygenQueue.pop();
 
             // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, <timestamp>");
+            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, ");
             hydrogenQueue.pop();
 
             // std::cout << "H" << hydrogenQueue.front() << ", bond, <timestamp>" << std::endl;
-            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, <timestamp>");
+            log("H" + std::to_string(hydrogenQueue.front()) + ", bond, ");
             hydrogenQueue.pop();
         }
     }
@@ -84,7 +99,7 @@ void handleClient(SOCKET clientSocket) {
 
             if (particleId % 2 == 0) {
                 int id = particleId / 2; 
-                monitor.log("H" + std::to_string(id) + " , request, <timestamp>");
+                monitor.log("H" + std::to_string(id) + ", request, ");
                 //std::cout << "H" << id << ", request, <timestamp>" << std::endl; 
                 // hydrogenQueue.push(id); 
                 monitor.addToHydrogenQueue(id); 
@@ -92,7 +107,7 @@ void handleClient(SOCKET clientSocket) {
             }
             else {
                 int id = particleId / 2 + 1; 
-                monitor.log("O" + std::to_string(id) + " , request, <timestamp>");
+                monitor.log("O" + std::to_string(id) + ", request, ");
                 // std::cout << "O" << id << ", request, <timestamp>" << std::endl;
                 // oxygenQueue.push(id); 
                 monitor.addToOxygenQueue(id); 

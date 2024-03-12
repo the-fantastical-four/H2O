@@ -8,7 +8,7 @@
 
 #define NUM_PARTICLES 1000
 
-const int PORT = 6250; 
+const int PORT = 6250;
 
 int main() {
 
@@ -30,7 +30,8 @@ int main() {
     // Connect to the server
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
-    if (InetPton(AF_INET, _T("25.14.62.92"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
+    //"25.14.62.92"
+    if (InetPton(AF_INET, _T("127.0.0.1"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
         std::cerr << "Invalid address.\n";
         closesocket(clientSocket);
         WSACleanup();
@@ -51,33 +52,33 @@ int main() {
     std::string moleculeType;
     int requests;
     int i = 1;
-    int step = 2;
-
+    //int step = 1;
+    
     std::cout << "H or O?: ";
     std::cin >> moleculeType;
 
-    std::cout << "Input number of requests: ";
-    std::cin >> requests;
-    
-    int nRequests = requests * 2;
-
     if (moleculeType == "H") {
         i = 2;
-        nRequests += 2;
     }
+
+    std::cout << "Input number of requests: ";
+    std::cin >> requests;
+
+    int nRequests = requests;
 
     // send requests to server 
     // this loop will be different depending on oxygen or hydrogen 
-    for (i; i < nRequests; i += step) {
+    for (i; i <= nRequests * 2; i += 2) {
         std::cout << i << std::endl;
         int toSend = htonl(i);
         send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
     }
+    
 
     // receive responses from the server 
 
-    char buffer[2048]; 
-    int bytesReceived; 
+    char buffer[2048];
+    int bytesReceived;
 
     do {
         bytesReceived = recv(clientSocket, buffer, 2048 - 1, 0);
@@ -95,7 +96,7 @@ int main() {
         buffer[bytesReceived] = '\0';  // Ensure null-termination
         std::cout << "SERVER: " << buffer << std::endl;
 
-    } while (bytesReceived > 0); 
+    } while (bytesReceived > 0);
 
     // Cleanup
     closesocket(clientSocket);
