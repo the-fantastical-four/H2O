@@ -18,7 +18,16 @@
 int PORT = 6250;
 
 std::vector<SOCKET> clients; 
-std::mutex clientMutex; 
+std::mutex clientMutex;
+
+int hydrogenRequests = 0; 
+int oxygenRequests = 0; 
+int hydrogensBonded = 0;
+int oxygensBonded = 0;
+
+std::chrono::system_clock::time_point earliestTimeO;
+std::chrono::system_clock::time_point earliestTimeH; 
+std::chrono::system_clock::time_point latestTime; 
 
 std::string getCurrentTimeString() {
 
@@ -35,7 +44,6 @@ std::string getCurrentTimeString() {
 
     // Return the formatted time as a string
     return oss.str();
-
 }
 
 struct BondMonitor {
@@ -57,11 +65,12 @@ struct BondMonitor {
         // Lock the mutex to ensure exclusive access to std::cout
         std::lock_guard<std::mutex> guard(logMutex);
 
-        std::cout << message;
+        std::cout << message << getCurrentTimeString() << std::endl;
     }
 
     void sendMessageToClient(int clientIndex, std::string message) {
-        int bytesSent = send(clients[clientIndex], message.c_str(), static_cast<int>(message.length()), 0);
+        std::string toSend = message + "/";
+        int bytesSent = send(clients[clientIndex], toSend.c_str(), static_cast<int>(toSend.length()), 0);
 
         if (bytesSent == SOCKET_ERROR) {
             std::cerr << "Failed to send message.\n";
@@ -74,20 +83,23 @@ struct BondMonitor {
 
             std::string message; 
 
-            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
+            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(OXYGEN_CLIENT, message); 
             oxygenQueue.pop();
+            oxygensBonded++; 
 
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
+            hydrogensBonded++;
 
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, " + getCurrentTimeString() + "\n";
+            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
+            hydrogensBonded++; 
         }
     }
 };
@@ -95,6 +107,7 @@ struct BondMonitor {
 BondMonitor monitor; 
 
 void handleClient(SOCKET clientSocket) {
+
     while (true) {
         // handle receiving requests from the clients here
 
@@ -109,14 +122,21 @@ void handleClient(SOCKET clientSocket) {
             // sort received id's to their respective queues and log
 
             if (particleId % 2 == 0) {
+                if (hydrogenRequests == 0) {
+                    earliestTimeH = std::chrono::system_clock::now(); 
+                }
+                hydrogenRequests++; 
                 int id = particleId / 2; 
-                monitor.log("H" + std::to_string(id) + ", request, " + getCurrentTimeString() + "\n");
+                monitor.log("H" + std::to_string(id) + ", request, ");
                 monitor.addToHydrogenQueue(id); 
-
             }
             else {
+                if (oxygenRequests == 0) {
+                    earliestTimeO = std::chrono::system_clock::now();
+                }
+                oxygenRequests++; 
                 int id = particleId / 2 + 1; 
-                monitor.log("O" + std::to_string(id) + ", request, " + getCurrentTimeString() + "\n");
+                monitor.log("O" + std::to_string(id) + ", request, ");
                 monitor.addToOxygenQueue(id); 
             }
         }
@@ -186,6 +206,15 @@ int main() {
 
             std::cout << "Client connected.\n";
 
+            // Set socket to non-blocking mode
+            u_long mode = 1; // 1 for non-blocking, 0 for blocking
+            if (ioctlsocket(clientSocket, FIONBIO, &mode) != 0) {
+                std::cerr << "Error setting non-blocking mode: " << WSAGetLastError() << std::endl;
+                closesocket(clientSocket);
+                WSACleanup();
+                return 1;
+            }
+
             {
                 std::lock_guard<std::mutex> lock(clientMutex);
                 clients.push_back(clientSocket); 
@@ -199,6 +228,8 @@ int main() {
     acceptClientThread.detach(); 
 
     bondThread.join(); 
+
+    
 
     closesocket(serverSocket);
     WSACleanup();
