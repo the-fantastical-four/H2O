@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <ctime>
 #include <sstream>
+#include <set>
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
@@ -29,6 +30,8 @@ std::chrono::system_clock::time_point earliestTimeO;
 std::chrono::system_clock::time_point earliestTimeH; 
 std::chrono::system_clock::time_point latestTime; 
 
+int errors = 0; 
+
 std::string getCurrentTimeString() {
 
     // Get the current time
@@ -46,18 +49,31 @@ std::string getCurrentTimeString() {
     return oss.str();
 }
 
+bool isInSet(std::set<int> set, int element) {
+    if (set.find(element) != set.end()) {
+        return false; 
+    }
+
+    return true; 
+}
+
 struct BondMonitor {
     std::queue<int> hydrogenQueue;
     std::queue<int> oxygenQueue;
+
+    std::set<int> hydrogenSet; 
+    std::set<int> oxygenSet; 
 
     std::mutex logMutex;
 
     void addToHydrogenQueue(int id) {
         hydrogenQueue.push(id); 
+        hydrogenSet.insert(id); 
     }
 
     void addToOxygenQueue(int id) {
         oxygenQueue.push(id); 
+        oxygenSet.insert(id); 
     }
 
     // this is just to ensure that logs aren't logging at the same time 
@@ -81,20 +97,40 @@ struct BondMonitor {
 
         if (!oxygenQueue.empty() && hydrogenQueue.size() >= 2) {
 
+            if (oxygenQueue.empty() || hydrogenQueue.size() < 2) {
+                errors++; 
+                std::cout << "Insufficient number of atoms to bond" << std::endl; 
+            }
+
             std::string message; 
 
+            int front = oxygenQueue.front(); 
+            if (isInSet(oxygenSet, front)) {
+                errors++; 
+                std::cout << "Invalid bond" << front << std::endl; 
+            }
             message = "O" + std::to_string(oxygenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(OXYGEN_CLIENT, message); 
             oxygenQueue.pop();
             oxygensBonded++; 
 
+            front = hydrogenQueue.front(); 
+            if (isInSet(hydrogenSet, front)) {
+                errors++;
+                std::cout << "Invalid bond no request H" << front << std::endl;
+            }
             message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
             hydrogenQueue.pop();
             hydrogensBonded++;
 
+            front = hydrogenQueue.front();
+            if (isInSet(hydrogenSet, front)) {
+                errors++;
+                std::cout << "Invalid bond no request H" << front << std::endl;
+            }
             message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
