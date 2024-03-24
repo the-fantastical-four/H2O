@@ -123,9 +123,9 @@ void handleClient(SOCKET clientSocket) {
 
             if (particleId % 2 == 0) {
                 if (hydrogenRequests == 0) {
-                    earliestTimeH = std::chrono::system_clock::now(); 
+                    earliestTimeH = std::chrono::system_clock::now();
+                    hydrogenRequests++;
                 }
-                hydrogenRequests++; 
                 int id = particleId / 2; 
                 monitor.log("H" + std::to_string(id) + ", request, ");
                 monitor.addToHydrogenQueue(id); 
@@ -133,8 +133,8 @@ void handleClient(SOCKET clientSocket) {
             else {
                 if (oxygenRequests == 0) {
                     earliestTimeO = std::chrono::system_clock::now();
+                    oxygenRequests++;
                 }
-                oxygenRequests++; 
                 int id = particleId / 2 + 1; 
                 monitor.log("O" + std::to_string(id) + ", request, ");
                 monitor.addToOxygenQueue(id); 
@@ -145,11 +145,13 @@ void handleClient(SOCKET clientSocket) {
     }
 }
 
-void makeBonds() {
+void makeBonds(int expectedH, int expectedO) {
     std::cout << "creating bonds..." << std::endl; 
-    while (true) {
+    while (oxygensBonded < expectedO || hydrogensBonded < expectedH) {
         monitor.bond(); 
     }
+    latestTime = std::chrono::system_clock::now(); 
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 int main() {
@@ -191,7 +193,15 @@ int main() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    std::thread bondThread = std::thread(makeBonds);
+    int expectedH; 
+    std::cout << "Enter number of Hydrogen: ";
+    std::cin >> expectedH; 
+
+    int expectedO; 
+    std::cout << "Enter number of Oxygen: "; 
+    std::cin >> expectedO; 
+
+    std::thread bondThread = std::thread(makeBonds, expectedH, expectedO);
 
     // Accept a client socket
     // launching a thread to accept multiple clients 
@@ -229,7 +239,10 @@ int main() {
 
     bondThread.join(); 
 
-    
+    auto duration = (earliestTimeH < earliestTimeO) ? latestTime - earliestTimeH : latestTime - earliestTimeO;
+    double seconds = std::chrono::duration<double>(duration).count();
+
+    std::cout << "Number of seconds elapsed: " << seconds << std::endl;
 
     closesocket(serverSocket);
     WSACleanup();
