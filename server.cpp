@@ -32,6 +32,8 @@ std::chrono::system_clock::time_point latestTime;
 
 int errors = 0; 
 
+std::atomic<int> finishedClients(0);
+
 std::string getCurrentTimeString() {
 
     // Get the current time
@@ -157,7 +159,10 @@ void handleClient(SOCKET clientSocket) {
              
             // sort received id's to their respective queues and log
 
-            if (particleId % 2 == 0) {
+            if (particleId < 0) {
+                finishedClients++; 
+            }
+            else if (particleId % 2 == 0) {
                 if (hydrogenRequests == 0) {
                     earliestTimeH = std::chrono::system_clock::now();
                     hydrogenRequests++;
@@ -181,13 +186,13 @@ void handleClient(SOCKET clientSocket) {
     }
 }
 
-void makeBonds(int expectedH, int expectedO) {
+void makeBonds() {
     std::cout << "creating bonds..." << std::endl; 
-    while (oxygensBonded < expectedO || hydrogensBonded < expectedH) {
+    while (finishedClients < 2) {
         monitor.bond(); 
     }
     latestTime = std::chrono::system_clock::now(); 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 int main() {
@@ -229,15 +234,7 @@ int main() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    int expectedH; 
-    std::cout << "Enter number of Hydrogen: ";
-    std::cin >> expectedH; 
-
-    int expectedO; 
-    std::cout << "Enter number of Oxygen: "; 
-    std::cin >> expectedO; 
-
-    std::thread bondThread = std::thread(makeBonds, expectedH, expectedO);
+    std::thread bondThread = std::thread(makeBonds);
 
     // Accept a client socket
     // launching a thread to accept multiple clients 

@@ -169,6 +169,10 @@ int main() {
 
     }
 
+    int end = -1;
+    int endSymbol = htonl(end);
+    send(clientSocket, reinterpret_cast<char*>(&endSymbol), sizeof(endSymbol), 0);
+
     // Cleanup
     closesocket(clientSocket);
     WSACleanup();
