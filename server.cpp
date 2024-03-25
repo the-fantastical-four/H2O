@@ -105,7 +105,7 @@ struct BondMonitor {
             std::string message; 
 
             int front = oxygenQueue.front(); 
-            if (isInSet(oxygenSet, front)) {
+            if (!isInSet(oxygenSet, front)) {
                 errors++; 
                 std::cout << "Invalid bond" << front << std::endl; 
             }
@@ -116,7 +116,7 @@ struct BondMonitor {
             oxygensBonded++; 
 
             front = hydrogenQueue.front(); 
-            if (isInSet(hydrogenSet, front)) {
+            if (!isInSet(hydrogenSet, front)) {
                 errors++;
                 std::cout << "Invalid bond no request H" << front << std::endl;
             }
@@ -127,7 +127,7 @@ struct BondMonitor {
             hydrogensBonded++;
 
             front = hydrogenQueue.front();
-            if (isInSet(hydrogenSet, front)) {
+            if (!isInSet(hydrogenSet, front)) {
                 errors++;
                 std::cout << "Invalid bond no request H" << front << std::endl;
             }
@@ -279,6 +279,7 @@ int main() {
     double seconds = std::chrono::duration<double>(duration).count();
 
     std::cout << "Number of seconds elapsed: " << seconds << std::endl;
+    std::cout << "Number of errors: " << errors << std::endl; 
 
     closesocket(serverSocket);
     WSACleanup();

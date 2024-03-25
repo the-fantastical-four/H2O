@@ -65,7 +65,7 @@ int main() {
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     //"25.14.62.92"
-    if (InetPton(AF_INET, _T("127.0.0.1"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
+    if (InetPton(AF_INET, _T("25.17.98.165"), &(serverAddr.sin_addr)) != 1) {  // Use InetPton
         std::cerr << "Invalid address.\n";
         closesocket(clientSocket);
         WSACleanup();
