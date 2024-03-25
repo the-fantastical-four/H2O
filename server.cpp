@@ -51,10 +51,10 @@ std::string getCurrentTimeString() {
 
 bool isInSet(std::set<int> set, int element) {
     if (set.find(element) != set.end()) {
-        return false; 
+        return true; 
     }
 
-    return true; 
+    return false; 
 }
 
 struct BondMonitor {
