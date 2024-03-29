@@ -118,7 +118,7 @@ int main() {
 
     // receive responses from the server 
 
-    char buffer[32768];
+    char buffer[2197152];
     int bytesReceived;
 
     int responseReceived = 0; 
@@ -141,7 +141,7 @@ int main() {
         // Clear the buffer before each recv call
         memset(buffer, 0, sizeof(buffer));
 
-        bytesReceived = recv(clientSocket, buffer, 32768, 0);
+        bytesReceived = recv(clientSocket, buffer, 2197152, 0);
 
         if (bytesReceived == SOCKET_ERROR) {
             int error = WSAGetLastError();
