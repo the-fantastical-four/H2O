@@ -68,9 +68,14 @@ struct BondMonitor {
 
     std::mutex logMutex;
 
+    std::mutex hydrogenMutex;
+    std::mutex oxygenMutex;
+
     void addToHydrogenQueue(int id) {
+        hydrogenMutex.lock(); 
         hydrogenQueue.push(id); 
         hydrogenSet.insert(id); 
+        hydrogenMutex.unlock(); 
     }
 
     void addToOxygenQueue(int id) {
@@ -97,6 +102,9 @@ struct BondMonitor {
 
     void bond() {
 
+        // lock here 
+        hydrogenMutex.lock(); 
+        oxygenMutex.lock(); 
         if (!oxygenQueue.empty() && hydrogenQueue.size() >= 2) {
 
             if (oxygenQueue.empty() || hydrogenQueue.size() < 2) {
@@ -104,47 +112,57 @@ struct BondMonitor {
                 std::cout << "Insufficient number of atoms to bond" << std::endl; 
             }
 
-            std::string message; 
+            // get front and dequeue here 
+            int oxygen = oxygenQueue.front(); 
+            oxygenQueue.pop(); 
 
-            int front = oxygenQueue.front(); 
-            if (!isInSet(oxygenSet, front)) {
+            oxygenMutex.unlock(); 
+
+            int h1 = hydrogenQueue.front();
+            hydrogenQueue.pop();
+            int h2 = hydrogenQueue.front(); 
+            hydrogenQueue.pop(); 
+            
+            hydrogenMutex.unlock(); 
+
+            std::string message; 
+            if (!isInSet(oxygenSet, oxygen)) {
                 errors++; 
-                std::cout << "Invalid bond" << front << std::endl; 
+                std::cout << "Invalid bond" << oxygen << std::endl; 
             }
-            message = "O" + std::to_string(oxygenQueue.front()) + ", bond, ";
+            message = "O" + std::to_string(oxygen) + ", bond, ";
             log(message);
             sendMessageToClient(OXYGEN_CLIENT, message); 
-            oxygenQueue.pop();
             oxygensBonded++; 
 
-            front = hydrogenQueue.front(); 
-            if (!isInSet(hydrogenSet, front)) {
+            if (!isInSet(hydrogenSet, h1)) {
                 errors++;
-                std::cout << "Invalid bond no request H" << front << std::endl;
+                std::cout << "Invalid bond no request H" << h1 << std::endl;
             }
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
+            message = "H" + std::to_string(h1) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
-            hydrogenQueue.pop();
             hydrogensBonded++;
 
-            front = hydrogenQueue.front();
-            if (!isInSet(hydrogenSet, front)) {
+            if (!isInSet(hydrogenSet, h2)) {
                 errors++;
-                std::cout << "Invalid bond no request H" << front << std::endl;
+                std::cout << "Invalid bond no request H" << h2 << std::endl;
             }
-            message = "H" + std::to_string(hydrogenQueue.front()) + ", bond, ";
+            message = "H" + std::to_string(h2) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
-            hydrogenQueue.pop();
             hydrogensBonded++; 
+        }
+        else {
+            hydrogenMutex.unlock();
+            oxygenMutex.unlock();
         }
     }
 };
 
 BondMonitor monitor; 
 
-void handleClient(SOCKET clientSocket) {
+void handleClient(SOCKET clientSocket) { // add client id 
 
     while (true) {
         // handle receiving requests from the clients here
@@ -191,8 +209,8 @@ void makeBonds() {
     while (finishedClients < 2) {
         monitor.bond(); 
     }
-    latestTime = std::chrono::system_clock::now(); 
     // std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::cout << "Ending bonding" << std::endl; 
 }
 
 int main() {
@@ -234,7 +252,16 @@ int main() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    std::thread bondThread = std::thread(makeBonds);
+    std::vector<std::thread> threads; 
+    int numThreads = std::thread::hardware_concurrency(); 
+
+    numThreads = (numThreads <= 0) ? 1 : numThreads; 
+
+    for (int i = 0; i < numThreads; i++) {
+        threads.emplace_back(std::thread(makeBonds)); 
+    }
+
+    // std::thread bondThread = std::thread(makeBonds);
 
     // Accept a client socket
     // launching a thread to accept multiple clients 
@@ -270,7 +297,12 @@ int main() {
 
     acceptClientThread.detach(); 
 
-    bondThread.join(); 
+    // bondThread.join(); 
+
+    for (auto& thread : threads) {
+        thread.join(); 
+    }
+    latestTime = std::chrono::system_clock::now();
 
     auto duration = (earliestTimeH < earliestTimeO) ? latestTime - earliestTimeH : latestTime - earliestTimeO;
     double seconds = std::chrono::duration<double>(duration).count();
