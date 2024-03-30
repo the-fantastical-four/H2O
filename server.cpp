@@ -30,7 +30,7 @@ std::chrono::system_clock::time_point earliestTimeO;
 std::chrono::system_clock::time_point earliestTimeH; 
 std::chrono::system_clock::time_point latestTime; 
 
-int errors = 0; 
+std::atomic<int> errors(0);
 
 std::atomic<int> finishedClients(0);
 
@@ -116,42 +116,42 @@ struct BondMonitor {
             int oxygen = oxygenQueue.front(); 
             oxygenQueue.pop(); 
 
+            if (!isInSet(oxygenSet, oxygen)) {
+                errors++;
+                std::cout << "Invalid bond" << oxygen << std::endl;
+            }
+
             oxygenMutex.unlock(); 
 
             int h1 = hydrogenQueue.front();
             hydrogenQueue.pop();
             int h2 = hydrogenQueue.front(); 
             hydrogenQueue.pop(); 
-            
-            hydrogenMutex.unlock(); 
-
-            std::string message; 
-            if (!isInSet(oxygenSet, oxygen)) {
-                errors++; 
-                std::cout << "Invalid bond" << oxygen << std::endl; 
-            }
-            message = "O" + std::to_string(oxygen) + ", bond, ";
-            log(message);
-            sendMessageToClient(OXYGEN_CLIENT, message); 
-            oxygensBonded++; 
 
             if (!isInSet(hydrogenSet, h1)) {
                 errors++;
                 std::cout << "Invalid bond no request H" << h1 << std::endl;
             }
-            message = "H" + std::to_string(h1) + ", bond, ";
-            log(message);
-            sendMessageToClient(HYDROGEN_CLIENT, message); 
-            hydrogensBonded++;
 
             if (!isInSet(hydrogenSet, h2)) {
                 errors++;
                 std::cout << "Invalid bond no request H" << h2 << std::endl;
             }
+
+            hydrogenMutex.unlock(); 
+
+            std::string message; 
+            message = "O" + std::to_string(oxygen) + ", bond, ";
+            log(message);
+            sendMessageToClient(OXYGEN_CLIENT, message); 
+
+            message = "H" + std::to_string(h1) + ", bond, ";
+            log(message);
+            sendMessageToClient(HYDROGEN_CLIENT, message); 
+
             message = "H" + std::to_string(h2) + ", bond, ";
             log(message);
             sendMessageToClient(HYDROGEN_CLIENT, message); 
-            hydrogensBonded++; 
         }
         else {
             hydrogenMutex.unlock();
