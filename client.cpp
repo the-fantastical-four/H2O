@@ -35,17 +35,6 @@ std::string getCurrentTimeString() {
 
 }
 
-void sendRequests(SOCKET clientSocket, std::string moleculeType, int nRequests) {
-    for (int i = (moleculeType == "H" ? 2 : 1); i <= nRequests * 2; i += 2) {
-        int toSend = htonl(i);
-        send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
-
-        int id = (moleculeType == "H") ? i / 2 : i / 2 + 1;
-
-        std::cout << moleculeType << id << ", request, " << getCurrentTimeString() << std::endl;
-    }
-}
-
 int main() {
 
     // Initialize Winsock
@@ -96,20 +85,36 @@ int main() {
 
     std::cout << "Connected to server.\n";
 
-    // Prompt user for molecule type and number of requests
+    // TODO: prompt user for a start point and end point 
     std::string moleculeType;
     int requests;
+    int i = 1;
+    //int step = 1;
 
     std::cout << "H or O?: ";
     std::cin >> moleculeType;
+
+    if (moleculeType == "H") {
+        i = 2;
+    }
 
     std::cout << "Input number of requests: ";
     std::cin >> requests;
 
     int nRequests = requests;
 
-    // Start a separate thread to send requests
-    std::thread sendThread(sendRequests, clientSocket, moleculeType, nRequests);
+    // send requests to server 
+    // this loop will be different depending on oxygen or hydrogen 
+    auto earliestTime = getCurrentTime();
+    for (i; i <= nRequests * 2; i += 2) {
+        int toSend = htonl(i);
+        send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
+
+        int id = (moleculeType == "H") ? i / 2 : i / 2 + 1;
+
+        std::cout << moleculeType << id << ", request, " << getCurrentTimeString() << std::endl;
+    }
+
 
     // receive responses from the server 
 
@@ -164,10 +169,6 @@ int main() {
 
     }
 
-    // Wait for the sending thread to finish
-    sendThread.join();
-
-    // Send the end signal
     int end = -1;
     int endSymbol = htonl(end);
     send(clientSocket, reinterpret_cast<char*>(&endSymbol), sizeof(endSymbol), 0);
@@ -176,7 +177,7 @@ int main() {
     closesocket(clientSocket);
     WSACleanup();
 
-    auto duration = latestTime - getCurrentTime();
+    auto duration = latestTime - earliestTime;
 
     double seconds = std::chrono::duration<double>(duration).count();
 
