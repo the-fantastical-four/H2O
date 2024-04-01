@@ -10,6 +10,7 @@
 #include <ctime>
 #include <sstream>
 #include <set>
+#include <unordered_set>
 
 #pragma comment(lib, "ws2_32.lib") // Link with Ws2_32.lib
 
@@ -51,7 +52,7 @@ std::string getCurrentTimeString() {
     return oss.str();
 }
 
-bool isInSet(std::set<int> set, int element) {
+bool isInSet(std::unordered_set<int> set, int element) {
     if (set.find(element) != set.end()) {
         return true; 
     }
@@ -63,8 +64,8 @@ struct BondMonitor {
     std::queue<int> hydrogenQueue;
     std::queue<int> oxygenQueue;
 
-    std::set<int> hydrogenSet; 
-    std::set<int> oxygenSet; 
+    std::unordered_set<int> hydrogenSet; 
+    std::unordered_set<int> oxygenSet; 
 
     std::mutex logMutex;
 
