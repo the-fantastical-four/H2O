@@ -14,7 +14,7 @@
 const int PORT = 6250;
 
 auto getCurrentTime() {
-    return std::chrono::system_clock::now(); 
+    return std::chrono::system_clock::now();
 }
 
 std::string getCurrentTimeString() {
@@ -33,6 +33,17 @@ std::string getCurrentTimeString() {
     // Return the formatted time as a string
     return oss.str();
 
+}
+
+void sendRequests(SOCKET clientSocket, std::string moleculeType, int nRequests) {
+    for (int i = (moleculeType == "H" ? 2 : 1); i <= nRequests * 2; i += 2) {
+        int toSend = htonl(i);
+        send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
+
+        int id = (moleculeType == "H") ? i / 2 : i / 2 + 1;
+
+        std::cout << moleculeType << id << ", request, " << getCurrentTimeString() << std::endl;
+    }
 }
 
 int main() {
@@ -85,51 +96,35 @@ int main() {
 
     std::cout << "Connected to server.\n";
 
-    // TODO: prompt user for a start point and end point 
+    // Prompt user for molecule type and number of requests
     std::string moleculeType;
     int requests;
-    int i = 1;
-    //int step = 1;
-    
+
     std::cout << "H or O?: ";
     std::cin >> moleculeType;
-
-    if (moleculeType == "H") {
-        i = 2;
-    }
 
     std::cout << "Input number of requests: ";
     std::cin >> requests;
 
     int nRequests = requests;
 
-    // send requests to server 
-    // this loop will be different depending on oxygen or hydrogen 
-    auto earliestTime = getCurrentTime(); 
-    for (i; i <= nRequests * 2; i += 2) {
-        int toSend = htonl(i);
-        send(clientSocket, reinterpret_cast<char*>(&toSend), sizeof(toSend), 0);
-
-        int id = (moleculeType == "H") ? i / 2 : i / 2 + 1;
-
-        std::cout << moleculeType << id << ", request, " << getCurrentTimeString() << std::endl;
-    }
-    
+    // Start a separate thread to send requests
+    std::thread sendThread(sendRequests, clientSocket, moleculeType, nRequests);
 
     // receive responses from the server 
 
     char buffer[65536];
     int bytesReceived;
 
-    int responseReceived = 0; 
+    int responseReceived = 0;
 
     fd_set readSet;
     FD_ZERO(&readSet);
     FD_SET(clientSocket, &readSet);
 
-    std::chrono::system_clock::time_point latestTime; 
+    std::chrono::system_clock::time_point latestTime;
 
-    while(responseReceived < nRequests) {
+    while (responseReceived < nRequests) {
         int selectResult = select(0, &readSet, NULL, NULL, NULL);
 
         if (selectResult == SOCKET_ERROR) {
@@ -160,15 +155,19 @@ int main() {
             while (std::getline(iss, message, '/')) {
                 // Print or process each message individually
                 std::cout << message << getCurrentTimeString() << std::endl;
-                responseReceived++; 
+                responseReceived++;
                 if (responseReceived == nRequests) {
-                    latestTime = getCurrentTime(); 
+                    latestTime = getCurrentTime();
                 }
             }
         }
 
     }
 
+    // Wait for the sending thread to finish
+    sendThread.join();
+
+    // Send the end signal
     int end = -1;
     int endSymbol = htonl(end);
     send(clientSocket, reinterpret_cast<char*>(&endSymbol), sizeof(endSymbol), 0);
@@ -177,7 +176,7 @@ int main() {
     closesocket(clientSocket);
     WSACleanup();
 
-    auto duration = latestTime - earliestTime; 
+    auto duration = latestTime - getCurrentTime();
 
     double seconds = std::chrono::duration<double>(duration).count();
 
