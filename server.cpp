@@ -99,7 +99,7 @@ struct BondMonitor {
         int bytesSent = send(clients[clientIndex], toSend.c_str(), static_cast<int>(toSend.length()), 0);
 
         if (bytesSent == SOCKET_ERROR) {
-            std::cerr << "Failed to send message.\n";
+            std::cerr << "Failed to send message to client " << clientIndex << std::endl;
         }
     }
 
@@ -119,17 +119,23 @@ struct BondMonitor {
             int oxygen = oxygenQueue.front(); 
             oxygenQueue.pop(); 
 
-            if (!isInSet(oxygenSet, oxygen)) {
-                errors++;
-                std::cout << "Invalid bond no request O" << oxygen << std::endl;
-            }
-
             oxygenMutex.unlock(); 
 
             int h1 = hydrogenQueue.front();
             hydrogenQueue.pop();
             int h2 = hydrogenQueue.front(); 
             hydrogenQueue.pop(); 
+
+            hydrogenMutex.unlock(); 
+
+            if (!isInSet(oxygenSet, oxygen)) {
+                errors++;
+                std::cout << "Invalid bond no request O" << oxygen << std::endl;
+            }
+            std::string message; 
+            message = "O" + std::to_string(oxygen) + ", bond, ";
+            log(message);
+            sendMessageToClient(OXYGEN_CLIENT, message); 
 
             if (!isInSet(hydrogenSet, h1)) {
                 errors++;
@@ -140,13 +146,6 @@ struct BondMonitor {
                 errors++;
                 std::cout << "Invalid bond no request H" << h2 << std::endl;
             }
-
-            hydrogenMutex.unlock(); 
-
-            std::string message; 
-            message = "O" + std::to_string(oxygen) + ", bond, ";
-            log(message);
-            sendMessageToClient(OXYGEN_CLIENT, message); 
 
             message = "H" + std::to_string(h1) + ", bond, ";
             log(message);
