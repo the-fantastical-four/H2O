@@ -79,8 +79,10 @@ struct BondMonitor {
     }
 
     void addToOxygenQueue(int id) {
+        oxygenMutex.lock(); 
         oxygenQueue.push(id); 
         oxygenSet.insert(id); 
+        oxygenMutex.unlock(); 
     }
 
     // this is just to ensure that logs aren't logging at the same time 
@@ -118,7 +120,7 @@ struct BondMonitor {
 
             if (!isInSet(oxygenSet, oxygen)) {
                 errors++;
-                std::cout << "Invalid bond" << oxygen << std::endl;
+                std::cout << "Invalid bond no request O" << oxygen << std::endl;
             }
 
             oxygenMutex.unlock(); 
